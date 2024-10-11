@@ -15,6 +15,7 @@ import { isPrototypePollutionKey } from "./storage";
 import path = require("path");
 import Redis from "ioredis";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 
 function merge(original: any, updates: any): void {
   for (const property in updates) {
@@ -533,28 +534,25 @@ export class RedisS3Storage implements storage.Storage {
   }
 
   public addBlob(blobId: string, stream: stream.Readable, streamLength: number): Promise<string> {
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: blobId,
-      Body: stream,
-    };
+    const upload = new Upload({
+      client: this.s3Client,
+      params: {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: blobId,
+        Body: stream,
+      },
+    });
 
-    return q
-      .Promise<string>((resolve, reject) => {
-        this.s3Client
-          .send(new PutObjectCommand(params))
-          .then(() => {
-            resolve(blobId);
-          })
-          .catch(reject);
-      })
-      .then(() => {
-        this.blobs[blobId] = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${blobId}`;
-
-        this.saveStateAsync();
-
-        return blobId;
-      });
+    return q.Promise<string>((resolve, reject) => {
+      upload
+        .done()
+        .then(() => {
+          this.blobs[blobId] = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${blobId}`;
+          this.saveStateAsync();
+          resolve(blobId);
+        })
+        .catch(reject);
+    });
   }
 
   public getBlobUrl(blobId: string): Promise<string> {
