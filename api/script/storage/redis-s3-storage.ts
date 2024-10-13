@@ -16,7 +16,6 @@ import path = require("path");
 import Redis from "ioredis";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function merge(original: any, updates: any): void {
   for (const property in updates) {
@@ -557,22 +556,10 @@ export class RedisS3Storage implements storage.Storage {
   }
 
   public getBlobUrl(blobId: string): Promise<string> {
-    return q.Promise<string>(async (resolve, reject) => {
+    return q.Promise<string>((resolve, reject) => {
       const blobPath = this.blobs[blobId];
       if (blobPath) {
-        try {
-          const command = new GetObjectCommand({
-            Bucket: process.env.AWS_BUCKET_NAME,
-            Key: blobId,
-          });
-
-          // Generate a signed URL that expires in 1 hour (3600 seconds)
-          const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
-
-          resolve(signedUrl);
-        } catch (error) {
-          reject(new Error("Failed to generate signed URL"));
-        }
+        resolve(blobPath);
       } else {
         reject(new Error("Blob not found"));
       }
